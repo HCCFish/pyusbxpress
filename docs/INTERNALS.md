@@ -90,3 +90,21 @@ Different library builds will place the routines at different addresses, but
 the method is unchanged: take the addresses from that project's map file and
 re-run the checks.  If a future library version rejects the requests
 documented here, the same scanning approach will find the new selectors.
+
+## 7. Prior art and cross-checks
+
+The protocol has been implemented in the open before; this project's results
+were obtained independently (disassembly plus live device tests) and match:
+
+- Craig Shelley's `SiUSBXp_Linux_Driver` (2010, GPL-2, libusb 0.1) — its
+  `SI_Open` sends the same `DEVICE_OPEN` control request (`0x40 / 0x02 /
+  wValue 0x0002`), `SI_Close` sends `0x0004`, and data moves over the bulk
+  endpoints.
+- `fMeow/silabs_usb_xpress` (2020, GPL-3, Rust) — a port of that driver,
+  published on crates.io.
+
+Those projects are shorter reads if you only need the request values; this
+document describes the method, which also applies to other library versions
+and other peripherals.  The agreement between an independent 2010
+implementation and the behaviour observed here is a useful cross-check of
+the findings.

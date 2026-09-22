@@ -3,8 +3,10 @@
 This document describes the USB level behaviour of devices that use the
 Silicon Labs **USBXpress** device firmware library (C8051F32x / F34x / F38x).
 It is the protocol that the official host driver (`SiUSBXp.sys`) speaks; it
-is not documented by the vendor and was derived by interoperability research
-(see `INTERNALS.md`).
+is not documented by the vendor and was derived here by interoperability
+research (see `INTERNALS.md`).  The same sequence also appears in earlier
+community implementations — see the *Related projects* section of the
+README.
 
 All statements below were verified against a live C8051F380 target running
 firmware built with the vendor library.

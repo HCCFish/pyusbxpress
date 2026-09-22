@@ -4,11 +4,12 @@ Cross-platform Python client for Silicon Labs **USBXpress** devices
 (C8051F32x / C8051F34x / C8051F38x) — **without the vendor driver**.
 
 Silicon Labs' USBXpress host driver (`SiUSBXp.sys` / `SiUSBXp.dll`) is
-Windows-only and version-fragile, and the wire protocol between the host
-driver and the device firmware library is not publicly documented.  This
-project documents that protocol and provides a small Python client that
-talks to USBXpress devices directly over **libusb/WinUSB**, so the same code
-runs on Windows, Linux and macOS.
+Windows-only and version-fragile, and Silicon Labs does not document the
+wire protocol between the host driver and the device firmware library.  This
+project documents that protocol — independently re-derived here and
+consistent with earlier community implementations (see *Related projects*) —
+and provides a small Python client that talks to USBXpress devices directly
+over **libusb/WinUSB**, so the same code runs on Windows, Linux and macOS.
 
 > **Disclaimer** — this is an *unofficial* project based on interoperability
 > research.  It is not affiliated with or endorsed by Silicon Labs.  It
@@ -75,9 +76,9 @@ a minimal ping and for a complete bootloader flashing example.
 USBXpress is a **vendor-specific** USB device (interface class `0xFF`) with
 two bulk endpoints (64-byte packets) and a small set of vendor control
 requests.  The data path stays disabled until the host sends the
-`DEVICE_OPEN` control request — this handshake is the piece that the public
-documentation does not describe, and the reason "enumeration works but no
-data ever arrives" is a common complaint.
+`DEVICE_OPEN` control request — this handshake is the piece that Silicon
+Labs' documentation does not describe, and the reason "enumeration works but
+no data ever arrives" is a common complaint.
 
 | Direction | Transport |
 |---|---|
@@ -146,6 +147,22 @@ python -m unittest discover -s tests -v
 
 The tests cover the protocol helpers and the packet/response logic with a
 fake backend; no hardware is required.
+
+## Related projects
+
+The USBXpress wire protocol has been implemented in the open before.  It was
+re-derived independently for this project (device firmware library
+disassembly plus live device tests) and the results match:
+
+- [SiUSBXp_Linux_Driver](http://www.etheus.net/SiUSBXp_Linux_Driver) —
+  Craig Shelley's open-source C implementation (2010, GPL-2, libusb 0.1);
+  its `SI_Open` sends the same `DEVICE_OPEN` request and moves data over the
+  bulk endpoints.
+- [fMeow/silabs_usb_xpress](https://github.com/fMeow/silabs_usb_xpress) —
+  a Rust port of that driver (2020, GPL-3, published on crates.io).
+
+pyusbxpress differs by targeting modern libusb 1.0 from Python, being
+maintained and documented, and shipping a CLI with tested examples.
 
 ## License
 
