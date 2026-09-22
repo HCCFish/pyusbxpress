@@ -9,7 +9,7 @@ from .device import UsbXpressDevice, list_devices
 from .errors import UsbXpressError, UsbXpressNotFound
 from .util import BACKENDS, DEFAULT_PID, DEFAULT_VID, PACKET_SIZE
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 
 __all__ = [
     "UsbXpressDevice",
