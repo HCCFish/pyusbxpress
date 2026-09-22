@@ -36,7 +36,7 @@ if __package__ in (None, ""):
 
 from usbxpress import UsbXpressDevice
 from usbxpress.errors import UsbXpressError
-from usbxpress.util import BACKENDS, crc16_ccitt_false
+from usbxpress.util import BACKENDS, crc16_ccitt_false, parse_ihex
 
 CMD_QUERY = 0x01
 CMD_ERASE = 0x02
@@ -51,57 +51,6 @@ RECORD_ADDR = 0x2100     # validity record location
 PAGE_SIZE = 0x200        # flash page size
 WRITE_CHUNK = 58         # payload bytes per write packet (4-byte header)
 READ_CHUNK = 60          # payload bytes per read packet (3-byte header)
-
-
-def parse_ihex(path):
-    """Return a sparse address -> byte map from an Intel HEX file.
-
-    Data records (type 00) and the extended address records (type 02 segment
-    and type 04 linear) are handled; start address records (03/05) are
-    ignored and anything else is rejected.  Every record is checksum
-    verified.
-    """
-    memory = {}
-    base = 0
-    with open(path, "r", encoding="ascii") as handle:
-        for number, line in enumerate(handle, start=1):
-            line = line.strip()
-            if not line:
-                continue
-            if not line.startswith(":"):
-                raise UsbXpressError("line %d: not an Intel HEX record" % number)
-            try:
-                raw = bytes.fromhex(line[1:])
-            except ValueError as exc:
-                raise UsbXpressError("line %d: invalid hex data" % number) from exc
-            if len(raw) < 5:
-                raise UsbXpressError("line %d: record too short" % number)
-            count, address, record_type = raw[0], (raw[1] << 8) | raw[2], raw[3]
-            data = raw[4:4 + count]
-            if len(data) != count or len(raw) != count + 5:
-                raise UsbXpressError("line %d: record length mismatch" % number)
-            if sum(raw) & 0xFF:
-                raise UsbXpressError("line %d: checksum mismatch" % number)
-
-            if record_type == 0:
-                for offset, value in enumerate(data):
-                    memory[base + address + offset] = value
-            elif record_type == 1:
-                break
-            elif record_type == 2:
-                if count != 2:
-                    raise UsbXpressError("line %d: bad segment record" % number)
-                base = ((data[0] << 8) | data[1]) << 4
-            elif record_type == 4:
-                if count != 2:
-                    raise UsbXpressError("line %d: bad linear address record" % number)
-                base = ((data[0] << 8) | data[1]) << 16
-            elif record_type in (3, 5):
-                continue  # start address records are not needed here
-            else:
-                raise UsbXpressError(
-                    "line %d: unsupported record type %d" % (number, record_type))
-    return memory
 
 
 def bl_command(device, packet, retries=1):
@@ -160,7 +109,10 @@ def flash(device, memory, verify=True):
     if (high + 1) > WRITE_LIMIT:
         raise UsbXpressError("image ends above 0x%04X" % WRITE_LIMIT)
 
-    pages = sorted({address & ~(PAGE_SIZE - 1) for address in memory})
+    # Every page in the span is erased, written and verified; records missing
+    # from the HEX are written as 0xFF so that the flash content matches the
+    # image the CRC is computed over.
+    pages = list(range(low & ~(PAGE_SIZE - 1), high + 1, PAGE_SIZE))
     record_page = RECORD_ADDR & ~(PAGE_SIZE - 1)
     if record_page not in pages:
         raise UsbXpressError("image does not cover the record page 0x%04X" % record_page)
@@ -227,7 +179,7 @@ def main(argv=None):
             if not args.hexfile:
                 parser.error("a HEX file is required unless --info-only is used")
             flash(device, parse_ihex(args.hexfile), verify=not args.no_verify)
-    except UsbXpressError as exc:
+    except (UsbXpressError, ValueError, OSError) as exc:
         print("error: %s" % exc, file=sys.stderr)
         return 1
     print("done")

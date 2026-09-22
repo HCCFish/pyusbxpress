@@ -47,6 +47,17 @@ def _is_timeout_error(exc) -> bool:
     return "timed out" in str(exc).lower()
 
 
+def _usb_error_types(usb_core):
+    """Exception types raised by pyusb for device I/O problems.
+
+    Besides ``usb.core.USBError``, pyusb raises ``NotImplementedError`` for
+    libusb error codes it has no message for (for example a transient
+    ``LIBUSB_ERROR_NOT_SUPPORTED`` while a device re-enumerates).  Both must
+    be mapped to ``UsbXpressError`` so callers see a stable contract.
+    """
+    return (usb_core.USBError, NotImplementedError)
+
+
 def _platform_hint() -> str:
     if sys.platform.startswith("win"):
         return ("on Windows the device must be bound to WinUSB (for example with Zadig); "
@@ -77,6 +88,7 @@ class LibusbBackend:
         self.device_open = device_open
 
         self._usb_core, self._usb_util, self._libusb_backend = _import_usb()
+        self._usb_errors = _usb_error_types(self._usb_core)
         self._dev = None
         self._ep_out = None
         self._ep_in = None
@@ -135,7 +147,7 @@ class LibusbBackend:
 
         try:
             dev.set_configuration()
-        except self._usb_core.USBError:
+        except self._usb_errors:
             pass  # already configured
         try:
             cfg = dev.get_active_configuration()
@@ -148,14 +160,14 @@ class LibusbBackend:
             for endpoint in (self._ep_out, self._ep_in):
                 try:
                     dev.clear_halt(endpoint)
-                except self._usb_core.USBError:
+                except self._usb_errors:
                     pass  # endpoint was not halted
             if self.device_open:
                 self._vendor_request(REQUEST_DEVICE_OPEN)
         except UsbXpressError:
             self.close()
             raise
-        except self._usb_core.USBError as exc:
+        except self._usb_errors as exc:
             self.close()
             raise UsbXpressError(
                 "cannot open device: %s (%s)" % (exc, _platform_hint())) from exc
@@ -200,7 +212,7 @@ class LibusbBackend:
         timeout_ms = max(1, int(self.timeout * 1000))
         try:
             dev.ctrl_transfer(0x40, VENDOR_REQUEST, value, 0, None, timeout=timeout_ms)
-        except self._usb_core.USBError as exc:
+        except self._usb_errors as exc:
             raise UsbXpressError(
                 "vendor request 0x%04x failed: %s" % (value, exc)) from exc
 
@@ -217,7 +229,7 @@ class LibusbBackend:
         timeout_ms = max(1, int(self.timeout * 1000))
         try:
             self._ep_out.write(packet, timeout=timeout_ms)
-        except self._usb_core.USBError as exc:
+        except self._usb_errors as exc:
             raise UsbXpressError("bulk OUT write failed: %s" % exc) from exc
 
     def read_packet(self, timeout=None):
@@ -233,7 +245,7 @@ class LibusbBackend:
             try:
                 data = bytes(self._ep_in.read(
                     self.packet_size, timeout=max(1, int(remaining * 1000))))
-            except self._usb_core.USBError as exc:
+            except self._usb_errors as exc:
                 if _is_timeout_error(exc):
                     continue  # keep polling until the deadline
                 raise UsbXpressError("bulk IN read failed: %s" % exc) from exc

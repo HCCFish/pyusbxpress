@@ -1,6 +1,8 @@
+import os
+import tempfile
 import unittest
 
-from usbxpress.util import crc16_ccitt_false, hexdump, pad_packet
+from usbxpress.util import crc16_ccitt_false, hexdump, pad_packet, parse_ihex
 
 
 class PadPacketTests(unittest.TestCase):
@@ -35,6 +37,46 @@ class HexdumpTests(unittest.TestCase):
 
     def test_empty_input(self):
         self.assertEqual(hexdump(b""), "")
+
+
+class ParseIhexTests(unittest.TestCase):
+    def _write(self, text):
+        handle = tempfile.NamedTemporaryFile("w", suffix=".hex", delete=False,
+                                             encoding="ascii")
+        handle.write(text)
+        handle.close()
+        self.addCleanup(os.unlink, handle.name)
+        return handle.name
+
+    def test_reads_data_records(self):
+        path = self._write(":0400000001020304F2\n:00000001FF\n")
+        self.assertEqual(parse_ihex(path), {0: 1, 1: 2, 2: 3, 3: 4})
+
+    def test_handles_linear_address_records(self):
+        path = self._write(":020000040001F9\n:04000000AABBCCDDEE\n:00000001FF\n")
+        memory = parse_ihex(path)
+        self.assertEqual(memory[0x10000], 0xAA)
+        self.assertEqual(memory[0x10003], 0xDD)
+
+    def test_handles_segment_address_records(self):
+        path = self._write(":020000021000EC\n:04000000AABBCCDDEE\n:00000001FF\n")
+        memory = parse_ihex(path)
+        self.assertEqual(memory[0x10000], 0xAA)
+        self.assertEqual(memory[0x10003], 0xDD)
+
+    def test_ignores_start_address_records(self):
+        path = self._write(":0400000500002000D7\n:04000000AABBCCDDEE\n:00000001FF\n")
+        self.assertEqual(parse_ihex(path)[0], 0xAA)
+
+    def test_rejects_bad_checksum(self):
+        path = self._write(":0400000001020304F3\n:00000001FF\n")
+        with self.assertRaises(ValueError):
+            parse_ihex(path)
+
+    def test_rejects_unknown_record_type(self):
+        path = self._write(":00000006FA\n:00000001FF\n")
+        with self.assertRaises(ValueError):
+            parse_ihex(path)
 
 
 if __name__ == "__main__":

@@ -94,5 +94,54 @@ class PacketTests(unittest.TestCase):
         self.assertIsNone(backend.read_packet(timeout=0.05))
 
 
+class BrokenEndpoint:
+    def write(self, data, timeout=None):
+        raise NotImplementedError("Operation not supported")
+
+    def read(self, size, timeout=None):
+        raise NotImplementedError("Operation not supported")
+
+
+class BrokenDevice:
+    def ctrl_transfer(self, *args, **kwargs):
+        raise NotImplementedError("Operation not supported")
+
+
+@unittest.skipUnless(HAVE_PYUSB, "pyusb is not installed")
+class ErrorMappingTests(unittest.TestCase):
+    """pyusb raises NotImplementedError for libusb codes without a message."""
+
+    def test_open_maps_unmapped_error(self):
+        class BadDevice:
+            def set_configuration(self):
+                raise NotImplementedError("Operation not supported")
+
+            def get_active_configuration(self):
+                raise NotImplementedError("Operation not supported")
+
+        backend = LibusbBackend()
+        backend._find = lambda: BadDevice()
+        with self.assertRaises(UsbXpressError):
+            backend.open()
+
+    def test_read_maps_unmapped_error(self):
+        backend = make_backend()
+        backend._ep_in = BrokenEndpoint()
+        with self.assertRaises(UsbXpressError):
+            backend.read_packet(timeout=0.05)
+
+    def test_write_maps_unmapped_error(self):
+        backend = make_backend()
+        backend._ep_out = BrokenEndpoint()
+        with self.assertRaises(UsbXpressError):
+            backend.write_packet(b"\x01")
+
+    def test_vendor_request_maps_unmapped_error(self):
+        backend = make_backend()
+        backend._dev = BrokenDevice()
+        with self.assertRaises(UsbXpressError):
+            backend._vendor_request(REQUEST_DEVICE_OPEN)
+
+
 if __name__ == "__main__":
     unittest.main()
