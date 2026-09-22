@@ -19,9 +19,9 @@ runs on Windows, Linux and macOS.
 
 ## Status
 
-Alpha (v0.1.0).  Verified on Windows 10/11 with a C8051F380 target (see
-`docs/DEVICES.md`); Linux/macOS are supported by design (libusb backend) and
-reports are welcome.
+Alpha (v0.1.x).  Verified on Windows 10/11 with a C8051F380 target (see
+[`docs/DEVICES.md`](https://github.com/HCCFish/pyusbxpress/blob/main/docs/DEVICES.md));
+Linux/macOS are supported by design (libusb backend) and reports are welcome.
 
 ## Install
 
@@ -40,7 +40,7 @@ The libusb backend needs a USB driver that lets user space claim the device:
 | Platform | Requirement |
 |---|---|
 | Windows | Bind the device to **WinUSB** (e.g. with [Zadig](https://zadig.akeo.ie/)) — or keep the SiLabs driver and use `--backend siusbxp` |
-| Linux | A udev rule so the device is accessible without root — see `docs/LINUX.md` |
+| Linux | A udev rule so the device is accessible without root — see [`docs/LINUX.md`](https://github.com/HCCFish/pyusbxpress/blob/main/docs/LINUX.md) |
 | macOS | Usually nothing: vendor-specific devices are not claimed by a kernel driver, libusb can use them directly |
 
 ## Quick start
@@ -66,8 +66,9 @@ with UsbXpressDevice() as dev:               # VID 10C4 / PID EA61 by default
 `UsbXpressDevice` is deliberately thin: one 64-byte packet per call, plus a
 `command()` helper that skips unsolicited packets (some firmwares emit
 periodic heartbeats).  The meaning of the packets is up to your device
-firmware — see `examples/` for a minimal ping and for a complete bootloader
-flashing example.
+firmware — see
+[`examples/`](https://github.com/HCCFish/pyusbxpress/tree/main/examples) for
+a minimal ping and for a complete bootloader flashing example.
 
 ## How it works (short version)
 
@@ -86,9 +87,10 @@ data ever arrives" is a common complaint.
 | flush device buffers | same request with `wValue=0x0001` |
 
 Full details, including the device-side event bits and the recommended host
-sequence, are in **[docs/PROTOCOL.md](docs/PROTOCOL.md)**.  The method used
-to derive the protocol is described in
-[docs/INTERNALS.md](docs/INTERNALS.md).
+sequence, are in
+**[docs/PROTOCOL.md](https://github.com/HCCFish/pyusbxpress/blob/main/docs/PROTOCOL.md)**.
+The method used to derive the protocol is described in
+[docs/INTERNALS.md](https://github.com/HCCFish/pyusbxpress/blob/main/docs/INTERNALS.md).
 
 ## Backends
 
@@ -124,17 +126,17 @@ write     send one packet: --hex "01 55" | --text "hello" | --file image.bin
 
 | File | Contents |
 |---|---|
-| `docs/PROTOCOL.md` | The USBXpress wire protocol (requests, endpoints, events, host sequence) |
-| `docs/INTERNALS.md` | How the protocol was derived (reproducible method) |
-| `docs/LINUX.md` | udev rules, permissions, WSL2/usbipd testing recipe |
-| `docs/DEVICES.md` | Devices verified so far, and how to report a new one |
+| [`docs/PROTOCOL.md`](https://github.com/HCCFish/pyusbxpress/blob/main/docs/PROTOCOL.md) | The USBXpress wire protocol (requests, endpoints, events, host sequence) |
+| [`docs/INTERNALS.md`](https://github.com/HCCFish/pyusbxpress/blob/main/docs/INTERNALS.md) | How the protocol was derived (reproducible method) |
+| [`docs/LINUX.md`](https://github.com/HCCFish/pyusbxpress/blob/main/docs/LINUX.md) | udev rules, permissions, WSL2/usbipd testing recipe |
+| [`docs/DEVICES.md`](https://github.com/HCCFish/pyusbxpress/blob/main/docs/DEVICES.md) | Devices verified so far, and how to report a new one |
 
 ## Examples
 
 | File | Contents |
 |---|---|
-| `examples/ping.py` | Minimal command/response exchange |
-| `examples/flash_demo.py` | Complete example: flash an Intel HEX image through a bootloader that implements the reference command set (query/erase/write/read/go + validity record) |
+| [`examples/ping.py`](https://github.com/HCCFish/pyusbxpress/blob/main/examples/ping.py) | Minimal command/response exchange |
+| [`examples/flash_demo.py`](https://github.com/HCCFish/pyusbxpress/blob/main/examples/flash_demo.py) | Complete example: flash an Intel HEX image through a bootloader that implements the reference command set (query/erase/write/read/go + validity record) |
 
 ## Tests
 
@@ -147,4 +149,4 @@ fake backend; no hardware is required.
 
 ## License
 
-MIT — see `LICENSE`.
+MIT — see [`LICENSE`](https://github.com/HCCFish/pyusbxpress/blob/main/LICENSE).
