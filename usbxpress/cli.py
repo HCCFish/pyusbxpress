@@ -1,4 +1,4 @@
-"""Command line interface: ``usbxpress list|info|monitor|write``."""
+"""Command line interface: ``usbxpress list|info|monitor|write|flush|reset``."""
 
 from __future__ import annotations
 
@@ -137,6 +137,20 @@ def cmd_write(args):
     return 0
 
 
+def cmd_flush(args):
+    with _make_device(args) as device:
+        device.flush()
+        print("buffers flushed")
+    return 0
+
+
+def cmd_reset(args):
+    with _make_device(args) as device:
+        device.reset()
+        print("device reset and reopened")
+    return 0
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="usbxpress",
@@ -173,6 +187,15 @@ def build_parser():
     p_write.add_argument("--expect", type=_hex_int,
                          help="wait for a response whose first byte equals this value")
     p_write.set_defaults(func=cmd_write)
+
+    p_flush = subparsers.add_parser("flush", help="purge the device's USB buffers")
+    _add_common_options(p_flush)
+    p_flush.set_defaults(func=cmd_flush)
+
+    p_reset = subparsers.add_parser("reset",
+                                    help="reset the USB device and reopen it")
+    _add_common_options(p_reset)
+    p_reset.set_defaults(func=cmd_reset)
 
     return parser
 

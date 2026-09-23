@@ -127,6 +127,18 @@ class UsbXpressDevice:
         """Send one packet (zero padded to the packet size)."""
         self._backend.write_packet(data)
 
+    def flush(self):
+        """Purge the device's USB buffers and drop pending input packets."""
+        self._backend.flush()
+
+    def reset(self):
+        """Reset the USB device (it re-enumerates; the handle is reopened).
+
+        Refuses to run when several matching devices are attached and no
+        serial was given (the reopened device could be a different one).
+        """
+        self._backend.reset()
+
     def read(self, timeout=None):
         """Return one packet, or None when nothing arrived within the timeout."""
         return self._backend.read_packet(timeout)

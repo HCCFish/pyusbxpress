@@ -34,6 +34,11 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(args.backend, "auto")
         self.assertEqual(args.timeout, 1.0)
 
+    def test_flush_and_reset_subcommands_exist(self):
+        for command in ("flush", "reset"):
+            args = build_parser().parse_args([command])
+            self.assertTrue(callable(args.func))
+
 
 class FakeDevice:
     """Stand-in for UsbXpressDevice that records what the CLI sends."""
@@ -57,6 +62,12 @@ class FakeDevice:
 
     def command(self, data, match=None, timeout=None):
         return bytes([data[0], 0x55]) + bytes(8)
+
+    def flush(self):
+        self.flushed = True
+
+    def reset(self):
+        self.reset_called = True
 
 
 class MainTests(unittest.TestCase):
@@ -119,6 +130,14 @@ class MainTests(unittest.TestCase):
             os.unlink(path)
         self.assertEqual(code, 2)
         self.assertIn("nothing to send", errors.getvalue())
+
+    def test_flush_and_reset_run(self):
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(["flush"]), 0)
+            flushed = FakeDevice.instances[-1].flushed
+            self.assertEqual(cli.main(["reset"]), 0)
+        self.assertTrue(flushed)
+        self.assertTrue(FakeDevice.instances[-1].reset_called)
 
 
 if __name__ == "__main__":

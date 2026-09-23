@@ -12,6 +12,8 @@ class FakeBackend:
     def __init__(self, incoming=()):
         self.incoming = list(incoming)
         self.written = []
+        self.flushed = 0
+        self.resets = 0
         self.is_open = False
         self.info = {"backend": "fake"}
 
@@ -29,8 +31,11 @@ class FakeBackend:
             return self.incoming.pop(0)
         return None
 
-    def purge(self):
-        pass
+    def flush(self):
+        self.flushed += 1
+
+    def reset(self):
+        self.resets += 1
 
 
 class DeviceTests(unittest.TestCase):
@@ -65,6 +70,13 @@ class DeviceTests(unittest.TestCase):
         backend, device = self.make()
         with self.assertRaises(UsbXpressError):
             device.command(b"")
+
+    def test_flush_and_reset_are_forwarded(self):
+        backend, device = self.make()
+        device.flush()
+        device.reset()
+        self.assertEqual(backend.flushed, 1)
+        self.assertEqual(backend.resets, 1)
 
 
 if __name__ == "__main__":

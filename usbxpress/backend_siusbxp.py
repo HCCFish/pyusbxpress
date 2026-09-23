@@ -13,6 +13,7 @@ from __future__ import annotations
 import ctypes
 import os
 import sys
+import time
 
 from .errors import UsbXpressError, UsbXpressNotFound
 from .util import DEFAULT_PID, DEFAULT_VID, PACKET_SIZE, pad_packet
@@ -93,6 +94,10 @@ class SiUsbXpBackend:
         dll.SI_Write.restype = ctypes.c_int
         dll.SI_SetTimeouts.argtypes = [ctypes.c_ulong, ctypes.c_ulong]
         dll.SI_SetTimeouts.restype = ctypes.c_int
+        dll.SI_FlushBuffers.argtypes = [ctypes.c_void_p, ctypes.c_ubyte, ctypes.c_ubyte]
+        dll.SI_FlushBuffers.restype = ctypes.c_int
+        dll.SI_ResetDevice.argtypes = [ctypes.c_void_p]
+        dll.SI_ResetDevice.restype = ctypes.c_int
 
     # -- discovery ---------------------------------------------------------
 
@@ -159,6 +164,46 @@ class SiUsbXpBackend:
                 self._dll.SI_Close(handle)
             except Exception:
                 pass
+
+    def flush(self):
+        """Flush the transmit and receive buffers (SI_FlushBuffers)."""
+        if not self._handle:
+            raise UsbXpressError("device is not open")
+        result = self._dll.SI_FlushBuffers(self._handle, 1, 1)
+        if result != 0:
+            raise UsbXpressError(
+                "SI_FlushBuffers failed with 0x%02x" % (result & 0xFF))
+
+    def reset(self, reopen_timeout=5.0):
+        """Reset the device (SI_ResetDevice) and reopen the handle.
+
+        The device re-enumerates after the reset; this waits for it to come
+        back.  Refuses to run when several devices are attached and no serial
+        was given, because the reopened device could be a different one.
+        """
+        if not self._handle:
+            raise UsbXpressError("device is not open")
+        if self.serial is None and self._num_devices() > 1:
+            raise UsbXpressError(
+                "several devices are attached; pass serial= to reset a "
+                "specific one")
+        result = self._dll.SI_ResetDevice(self._handle)
+        if result != 0:
+            raise UsbXpressError(
+                "SI_ResetDevice failed with 0x%02x" % (result & 0xFF))
+        self.close()
+
+        deadline = time.monotonic() + reopen_timeout
+        last_error = None
+        while time.monotonic() < deadline:
+            time.sleep(0.3)
+            try:
+                self.open()
+                return
+            except UsbXpressError as exc:
+                last_error = exc
+        raise UsbXpressError(
+            "device did not re-appear after reset (%s)" % last_error)
 
     # -- data path ---------------------------------------------------------
 

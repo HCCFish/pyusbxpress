@@ -216,6 +216,57 @@ class LibusbBackend:
             raise UsbXpressError(
                 "vendor request 0x%04x failed: %s" % (value, exc)) from exc
 
+    def flush(self):
+        """Ask the device to purge its USB buffers and drop pending input.
+
+        Sends the ``FIFO_PURGE`` vendor request and then drains any packets
+        that were already in flight, so the next exchange starts clean.
+        """
+        self._vendor_request(REQUEST_FIFO_PURGE)
+        deadline = time.monotonic() + 0.05
+        while time.monotonic() < deadline:
+            if self.read_packet(timeout=max(0.001, deadline - time.monotonic())) is None:
+                return  # nothing pending
+
+    def reset(self, reopen_timeout=5.0):
+        """Reset the USB device (port reset) and reopen it.
+
+        The device re-enumerates after the reset; this waits for it to come
+        back and opens it again.  Refuses to run when several matching
+        devices are attached and no serial was given, because the reopened
+        device could be a different one.  Raises ``UsbXpressError`` when the
+        device does not come back in time (the caller may retry :meth:`open`).
+        """
+        dev = self._dev
+        if dev is None:
+            raise UsbXpressError("device is not open")
+        if self.serial is None and len(self._find_all()) > 1:
+            raise UsbXpressError(
+                "several matching devices are attached; pass serial= to reset "
+                "a specific one")
+        self._dev = self._ep_out = self._ep_in = None
+        try:
+            dev.reset()
+        except self._usb_errors as exc:
+            raise UsbXpressError("device reset failed: %s" % exc) from exc
+        finally:
+            try:
+                self._usb_util.dispose_resources(dev)
+            except Exception:
+                pass
+
+        deadline = time.monotonic() + reopen_timeout
+        last_error = None
+        while time.monotonic() < deadline:
+            time.sleep(0.3)
+            try:
+                self.open()
+                return
+            except UsbXpressError as exc:
+                last_error = exc
+        raise UsbXpressError(
+            "device did not re-appear after reset (%s)" % last_error)
+
     # -- data path ---------------------------------------------------------
 
     def write_packet(self, data):

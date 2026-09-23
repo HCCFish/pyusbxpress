@@ -106,7 +106,7 @@ present, and falls back to the SiLabs driver on Windows when it is not.
 ## CLI reference
 
 ```
-usbxpress [-h] [--version] {list,info,monitor,write} ...
+usbxpress [-h] [--version] {list,info,monitor,write,flush,reset} ...
 
 common options:
   --vid HEX      vendor ID (default 10c4)
@@ -121,6 +121,8 @@ list      show matching devices and the backend that can see them
 info      open the device, print USB info; --send HEX performs one exchange
 monitor   print incoming packets with timestamps; --send HEX [--interval S] repeats a packet
 write     send one packet: --hex "01 55" | --text "hello" | --file image.bin
+flush     purge the device's USB buffers and drop pending input packets
+reset     reset the USB device (port reset) and reopen it
 ```
 
 ## Documentation
@@ -147,6 +149,23 @@ python -m unittest discover -s tests -v
 
 The tests cover the protocol helpers and the packet/response logic with a
 fake backend; no hardware is required.
+
+## API coverage (compared with the SiUSBXp API)
+
+pyusbxpress is not an API clone — it is a small Pythonic layer over the same
+protocol — but for porting purposes it covers the calls that matter:
+
+| SiUSBXp function | pyusbxpress | Notes |
+|---|---|---|
+| `SI_GetNumDevices` | `list_devices()`, `usbxpress list` | filters by VID/PID (and optional serial) |
+| `SI_GetProductString` | `info` (manufacturer/product/serial), `--serial` | reads the USB descriptors |
+| `SI_Open` / `SI_Close` | `open()` / `close()` | sends `DEVICE_OPEN` / `DEVICE_CLOSE` |
+| `SI_Read` / `SI_Write` | `read()`, `command()` / `write()` | one 64-byte packet per call |
+| `SI_SetTimeouts` | `timeout=` argument | per call; there is no global set/get |
+| `SI_FlushBuffers` | `flush()`, `usbxpress flush` | sends `FIFO_PURGE` and drops pending input |
+| `SI_ResetDevice` | `reset()`, `usbxpress reset` | USB port reset, then reopen |
+| `SI_CheckRXQueue` | not provided | `read()` returning `None` means "nothing pending"; there is no local ring buffer to inspect |
+| `SI_DeviceIOControl` | not applicable | CP21xx register IOCTLs, unrelated to the C8051 firmware protocol |
 
 ## Related projects
 

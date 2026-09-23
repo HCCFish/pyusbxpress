@@ -52,6 +52,10 @@ The device acknowledges these requests (no STALL) and they are idempotent.
 Sending any other vendor request is answered with a protocol STALL, which is
 why they can be discovered by scanning.
 
+A host may also reset the device at the USB level (a port reset).  The
+firmware library then reports a `USB_RESET` event and the device
+re-enumerates; this is what `UsbXpressDevice.reset()` / `usbxpress reset` do.
+
 ## 3. Data path gate (the important part)
 
 The device firmware library keeps its data path **disabled** until it has

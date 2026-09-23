@@ -30,6 +30,7 @@ class FakeEndpoint:
 class FakeDevice:
     def __init__(self):
         self.requests = []
+        self.resets = 0
 
     def ctrl_transfer(self, bm_request_type, request, value, index, data, timeout=None):
         self.requests.append((bm_request_type, request, value, index, data))
@@ -37,6 +38,9 @@ class FakeDevice:
 
     def clear_halt(self, endpoint):
         pass
+
+    def reset(self):
+        self.resets += 1
 
 
 def make_backend(incoming=None):
@@ -60,6 +64,40 @@ class VendorRequestTests(unittest.TestCase):
         backend._vendor_request(REQUEST_DEVICE_CLOSE)
         self.assertEqual(backend._dev.requests,
                          [(0x40, 0x02, 0x0004, 0, None)])
+
+    def test_flush_sends_the_purge_request(self):
+        backend = make_backend()
+        backend.flush()
+        self.assertEqual(backend._dev.requests,
+                         [(0x40, 0x02, 0x0001, 0, None)])
+
+    def test_flush_drains_pending_packets(self):
+        backend = make_backend(incoming=[b"\x01" + bytes(63), b"\x02" + bytes(63)])
+        backend.flush()
+        self.assertEqual(backend._ep_in.incoming, [])
+
+    def test_reset_reopens_the_device(self):
+        backend = make_backend()
+        device = backend._dev
+        opened = []
+        backend.open = lambda: opened.append(True)
+        backend.reset(reopen_timeout=0.5)
+        self.assertEqual(device.resets, 1)
+        self.assertEqual(opened, [True])
+
+    def test_reset_refuses_with_several_matching_devices(self):
+        backend = make_backend()
+        backend._find_all = lambda: [object(), object()]
+        with self.assertRaises(UsbXpressError):
+            backend.reset(reopen_timeout=0.2)
+
+    def test_reset_raises_when_the_device_does_not_return(self):
+        backend = make_backend()
+        device = backend._dev
+        backend._find = lambda: None
+        with self.assertRaises(UsbXpressError):
+            backend.reset(reopen_timeout=0.2)
+        self.assertEqual(device.resets, 1)
 
     def test_vendor_request_without_device_raises(self):
         backend = LibusbBackend()
